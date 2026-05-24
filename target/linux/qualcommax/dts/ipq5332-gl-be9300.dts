@@ -12,9 +12,24 @@
  *          4x 2.5 GbE LAN  (QCA8084 quad PHY)
  * USB:     1x USB 3.0
  *
- * NOTE: GPIO pin assignments for LEDs and buttons follow the GL.iNet
- *       vendor tree and the Wallys / Qualcomm AP-MI01.6 reference
- *       design. They may need fine-tuning once hardware is on hand.
+ * STATUS: SCAFFOLD - DO NOT FLASH.
+ *
+ * This DTS intentionally references only nodes that exist in the
+ * upstream Linux 6.12 ipq5332.dtsi (which the OpenWrt kernel pulls in
+ * unmodified). The following blocks are deliberately omitted because
+ * the kernel-side support does not exist yet:
+ *
+ *   - MDIO / PHY / PCS / PPE / EDMA (no driver/binding for IPQ5332)
+ *   - PCIe controller/PHY DTS nodes (the IPQ5332 PCIe UNIPHY 28LP
+ *     driver patch in qualcommax adds driver-level support, but the
+ *     SoC dtsi has no pcie* nodes upstream)
+ *   - Integrated 2.4 GHz radio (no wifi node upstream)
+ *
+ * GPIO numbers for the reset button and LEDs are UNVERIFIED placeholders
+ * derived from the Wallys / Qualcomm AP-MI01.6 reference layout and
+ * sibling GL.iNet devices. They MUST be confirmed against an actual
+ * GL-BE9300 via UART boot log + `gpio readall` from a recovery initramfs
+ * before the device can be considered usable.
  */
 
 /dts-v1/;
@@ -31,9 +46,6 @@
 
 	aliases {
 		serial0 = &blsp1_uart0;
-		ethernet0 = &dp1;
-		ethernet1 = &dp2;
-		label-mac-device = &dp1;
 		led-boot = &led_system;
 		led-failsafe = &led_system;
 		led-running = &led_system;
@@ -50,6 +62,7 @@
 		reset {
 			label = "reset";
 			linux,code = <KEY_RESTART>;
+			/* TODO: verify GPIO against hardware - placeholder from AP-MI01.6 ref */
 			gpios = <&tlmm 35 GPIO_ACTIVE_LOW>;
 			debounce-interval = <60>;
 		};
@@ -61,37 +74,14 @@
 		led_system: system {
 			function = LED_FUNCTION_STATUS;
 			color = <LED_COLOR_ID_WHITE>;
+			/* TODO: verify GPIO against hardware */
 			gpios = <&tlmm 36 GPIO_ACTIVE_HIGH>;
-		};
-
-		wan {
-			label = "white:wan";
-			function = LED_FUNCTION_WAN;
-			color = <LED_COLOR_ID_WHITE>;
-			gpios = <&tlmm 37 GPIO_ACTIVE_HIGH>;
-		};
-	};
-
-	reserved-memory {
-		bootloader@4a700000 {
-			reg = <0x0 0x4a700000 0x0 0x400000>;
-			no-map;
-		};
-
-		sbl@4ab00000 {
-			reg = <0x0 0x4ab00000 0x0 0x100000>;
-			no-map;
-		};
-
-		tz_apps@4ac00000 {
-			reg = <0x0 0x4ac00000 0x0 0x400000>;
-			no-map;
 		};
 	};
 };
 
 &blsp1_uart0 {
-	pinctrl-0 = <&uart_pins>;
+	pinctrl-0 = <&serial_0_pins>;
 	pinctrl-names = "default";
 	status = "okay";
 };
@@ -110,29 +100,6 @@
 };
 
 &tlmm {
-	uart_pins: uart-pins {
-		pins = "gpio18", "gpio19";
-		function = "blsp0_uart0";
-		drive-strength = <8>;
-		bias-disable;
-	};
-
-	mdio_pins: mdio-pins {
-		mdc {
-			pins = "gpio25";
-			function = "mdc";
-			drive-strength = <8>;
-			bias-pull-up;
-		};
-
-		mdio {
-			pins = "gpio26";
-			function = "mdio";
-			drive-strength = <8>;
-			bias-pull-up;
-		};
-	};
-
 	sdc_default_state: sdc-default-state {
 		clk-pins {
 			pins = "gpio5";
@@ -163,138 +130,6 @@
 			bias-pull-down;
 		};
 	};
-
-	pcie0_default: pcie0-default-state {
-		clkreq-n-pins {
-			pins = "gpio38";
-			function = "pcie0_clk";
-			drive-strength = <6>;
-			bias-pull-up;
-		};
-
-		perst-n-pins {
-			pins = "gpio39";
-			function = "gpio";
-			drive-strength = <8>;
-			bias-pull-down;
-			output-low;
-		};
-
-		wake-n-pins {
-			pins = "gpio40";
-			function = "pcie0_wake";
-			drive-strength = <6>;
-			bias-pull-up;
-		};
-	};
-
-	pcie1_default: pcie1-default-state {
-		clkreq-n-pins {
-			pins = "gpio43";
-			function = "pcie1_clk";
-			drive-strength = <6>;
-			bias-pull-up;
-		};
-
-		perst-n-pins {
-			pins = "gpio44";
-			function = "gpio";
-			drive-strength = <8>;
-			bias-pull-down;
-			output-low;
-		};
-
-		wake-n-pins {
-			pins = "gpio45";
-			function = "pcie1_wake";
-			drive-strength = <6>;
-			bias-pull-up;
-		};
-	};
-};
-
-&mdio {
-	pinctrl-0 = <&mdio_pins>;
-	pinctrl-names = "default";
-	status = "okay";
-
-	/* QCA8084 quad 2.5G PHY package - LAN ports */
-	ethernet-phy-package@0 {
-		compatible = "qcom,qca8084-package";
-		#address-cells = <1>;
-		#size-cells = <0>;
-		reg = <0>;
-
-		qca8084_0: ethernet-phy@1 {
-			compatible = "ethernet-phy-ieee802.3-c45";
-			reg = <1>;
-		};
-
-		qca8084_1: ethernet-phy@2 {
-			compatible = "ethernet-phy-ieee802.3-c45";
-			reg = <2>;
-		};
-
-		qca8084_2: ethernet-phy@3 {
-			compatible = "ethernet-phy-ieee802.3-c45";
-			reg = <3>;
-		};
-
-		qca8084_3: ethernet-phy@4 {
-			compatible = "ethernet-phy-ieee802.3-c45";
-			reg = <4>;
-		};
-	};
-
-	/* RTL8221B 2.5G PHY on WAN port */
-	rtl8221b: ethernet-phy@1c {
-		compatible = "ethernet-phy-ieee802.3-c45";
-		reg = <0x1c>;
-	};
-};
-
-&pcie0 {
-	pinctrl-0 = <&pcie0_default>;
-	pinctrl-names = "default";
-
-	perst-gpios = <&tlmm 39 GPIO_ACTIVE_LOW>;
-	wake-gpios = <&tlmm 40 GPIO_ACTIVE_LOW>;
-	status = "okay";
-
-	pcie@0 {
-		#address-cells = <3>;
-		#size-cells = <2>;
-		ranges;
-		reg = <0 0 0 0 0>;
-
-		wifi0: wifi@0,0 {
-			compatible = "pci17cb,1109";
-			reg = <0 0 0 0 0>;
-			qcom,ath12k-calibration-variant = "GL-iNet-BE9300";
-		};
-	};
-};
-
-&pcie1 {
-	pinctrl-0 = <&pcie1_default>;
-	pinctrl-names = "default";
-
-	perst-gpios = <&tlmm 44 GPIO_ACTIVE_LOW>;
-	wake-gpios = <&tlmm 45 GPIO_ACTIVE_LOW>;
-	status = "okay";
-
-	pcie@0 {
-		#address-cells = <3>;
-		#size-cells = <2>;
-		ranges;
-		reg = <0 0 0 0 0>;
-
-		wifi1: wifi@0,0 {
-			compatible = "pci17cb,1109";
-			reg = <0 0 0 0 0>;
-			qcom,ath12k-calibration-variant = "GL-iNet-BE9300";
-		};
-	};
 };
 
 &usb {
@@ -305,74 +140,6 @@
 	dr_mode = "host";
 };
 
-&usb_qmpphy {
+&usbphy0 {
 	status = "okay";
-};
-
-&usb_qusbphy {
-	status = "okay";
-};
-
-&wifi {
-	qcom,ath12k-calibration-variant = "GL-iNet-BE9300";
-	status = "okay";
-};
-
-/*
- * Ethernet ports. The IPQ5332 EDMA driver exposes ports via the PPE,
- * with QCA8084 as the LAN switch PHY package and RTL8221B as the WAN
- * PHY. dp1/dp2 labels are aliased above for board.d to address them.
- */
-&qcom_ppe {
-	status = "okay";
-
-	ethernet-ports {
-		#address-cells = <1>;
-		#size-cells = <0>;
-
-		dp1: port@1 {
-			reg = <1>;
-			phy-mode = "10g-qxgmii";
-			managed = "in-band-status";
-			phy-handle = <&qca8084_0>;
-			label = "lan1";
-			local-mac-address = [00 00 00 00 00 00];
-		};
-
-		port@2 {
-			reg = <2>;
-			phy-mode = "10g-qxgmii";
-			managed = "in-band-status";
-			phy-handle = <&qca8084_1>;
-			label = "lan2";
-			local-mac-address = [00 00 00 00 00 00];
-		};
-
-		port@3 {
-			reg = <3>;
-			phy-mode = "10g-qxgmii";
-			managed = "in-band-status";
-			phy-handle = <&qca8084_2>;
-			label = "lan3";
-			local-mac-address = [00 00 00 00 00 00];
-		};
-
-		port@4 {
-			reg = <4>;
-			phy-mode = "10g-qxgmii";
-			managed = "in-band-status";
-			phy-handle = <&qca8084_3>;
-			label = "lan4";
-			local-mac-address = [00 00 00 00 00 00];
-		};
-
-		dp2: port@5 {
-			reg = <5>;
-			phy-mode = "usxgmii";
-			managed = "in-band-status";
-			phy-handle = <&rtl8221b>;
-			label = "wan";
-			local-mac-address = [00 00 00 00 00 00];
-		};
-	};
 };
